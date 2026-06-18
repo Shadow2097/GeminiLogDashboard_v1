@@ -45,30 +45,33 @@ div[data-testid="stMetric"] {
 }
 
 .warning-card {
-    background-color: rgba(234, 179, 8, 0.1);
+    background-color: #272111;
     border-left: 5px solid #eab308;
     padding: 12px 16px;
     border-radius: 6px;
     margin: 10px 0;
-    color: #fef08a;
+    color: #ffedd5;
+    font-weight: 500;
 }
 
 .info-card {
-    background-color: rgba(56, 189, 248, 0.1);
+    background-color: #0f1c2e;
     border-left: 5px solid #38bdf8;
     padding: 12px 16px;
     border-radius: 6px;
     margin: 10px 0;
     color: #e0f2fe;
+    font-weight: 500;
 }
 
 .success-card {
-    background-color: rgba(34, 197, 94, 0.1);
+    background-color: #0d2216;
     border-left: 5px solid #22c55e;
     padding: 12px 16px;
     border-radius: 6px;
     margin: 10px 0;
     color: #dcfce7;
+    font-weight: 500;
 }
 
 .metric-grid {
@@ -316,6 +319,7 @@ with tab_overview:
 
 # ----------------- TAB 2: EXPLORER -----------------
 with tab_explorer:
+    st.markdown('<div id="session-explorer-top"></div>', unsafe_allow_html=True)
     with get_connection() as conn:
         sessions_dropdown = conn.execute("SELECT session_id, title FROM sessions ORDER BY created_at DESC").fetchall()
         
@@ -385,7 +389,29 @@ with tab_explorer:
                 yaxis=dict(title="Accumulated Context Tokens"),
                 margin=dict(l=40, r=40, t=20, b=40)
             )
-            st.plotly_chart(fig_growth, use_container_width=True)
+            
+            selected_data = st.plotly_chart(
+                fig_growth, 
+                use_container_width=True,
+                on_select="rerun",
+                selection_mode="points"
+            )
+            
+            if selected_data and "selection" in selected_data:
+                points = selected_data["selection"].get("points", [])
+                if points:
+                    clicked_step_idx = points[0].get("x")
+                    if clicked_step_idx is not None:
+                        st.components.v1.html(f"""
+                        <script>
+                            setTimeout(() => {{
+                                const element = window.parent.document.getElementById("step-card-{clicked_step_idx}");
+                                if (element) {{
+                                    element.scrollIntoView({{ behavior: "smooth", block: "center" }});
+                                }}
+                            }}, 100);
+                        </script>
+                        """, height=0, width=0)
             
             # Transcript Explorer
             st.subheader("💬 Conversation Transcript & Insights")
@@ -411,6 +437,7 @@ with tab_explorer:
                     label = f"👤 User Input"
                     
                 with st.chat_message(role):
+                    st.markdown(f'<div id="step-card-{step_idx}"></div>', unsafe_allow_html=True)
                     st.markdown(f"**{label}** &nbsp;•&nbsp; *Step {step_idx}* &nbsp;•&nbsp; *{created}*")
                     st.text(content)
                     
@@ -438,6 +465,12 @@ with tab_explorer:
                             f"</code>",
                             unsafe_allow_html=True
                         )
+                    
+                    # Back to Top Link
+                    st.markdown(
+                        f'<div style="text-align: right; margin-top: 10px;"><a href="#session-explorer-top" target="_self" style="color: #38bdf8; text-decoration: none; font-size: 0.8rem; font-weight: 500;">▲ Back to Top</a></div>',
+                        unsafe_allow_html=True
+                    )
     else:
         st.info("No conversation sessions loaded. Please configure the logs path and sync.")
 
