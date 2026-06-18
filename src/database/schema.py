@@ -1,3 +1,4 @@
+import os
 from .connection import get_connection
 
 def init_db():
@@ -72,4 +73,12 @@ def init_db():
         conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('flash_output_rate', '0.30');")
         conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('pro_input_rate', '1.25');")
         conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('pro_output_rate', '5.00');")
-        conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('logs_directory', 'C:\\Users\\Mike Markiw\\.gemini\\antigravity\\brain');")
+        default_logs_dir = os.path.join(os.path.expanduser("~"), ".gemini", "antigravity", "brain")
+        conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('logs_directory', ?);", (default_logs_dir,))
+        
+        # Migrate existing setups holding the old hardcoded username path to the dynamic path
+        conn.execute("""
+            UPDATE settings 
+            SET value = ? 
+            WHERE key = 'logs_directory' AND value = 'C:\\Users\\Mike Markiw\\.gemini\\antigravity\\brain'
+        """, (default_logs_dir,))
