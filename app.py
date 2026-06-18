@@ -319,6 +319,7 @@ with tab_overview:
 
 # ----------------- TAB 2: EXPLORER -----------------
 with tab_explorer:
+    st.markdown('<div id="session-explorer-top"></div>', unsafe_allow_html=True)
     with get_connection() as conn:
         sessions_dropdown = conn.execute("SELECT session_id, title FROM sessions ORDER BY created_at DESC").fetchall()
         
@@ -464,6 +465,12 @@ with tab_explorer:
                             f"</code>",
                             unsafe_allow_html=True
                         )
+                    
+                    # Back to Top Link
+                    st.markdown(
+                        f'<div style="text-align: right; margin-top: 10px;"><a href="#session-explorer-top" target="_self" style="color: #38bdf8; text-decoration: none; font-size: 0.8rem; font-weight: 500;">▲ Back to Top</a></div>',
+                        unsafe_allow_html=True
+                    )
     else:
         st.info("No conversation sessions loaded. Please configure the logs path and sync.")
 
