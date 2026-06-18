@@ -132,9 +132,22 @@ def ingest_logs():
                     turn_id = f"{session_id}_{turn['step_index']}"
                     conn.execute(
                         """
-                        INSERT OR REPLACE INTO turns (
+                        INSERT INTO turns (
                             turn_id, session_id, step_index, source, type, status, created_at, content, content_hash, model, input_tokens, output_tokens, cost
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ON CONFLICT(turn_id) DO UPDATE SET
+                            session_id = excluded.session_id,
+                            step_index = excluded.step_index,
+                            source = excluded.source,
+                            type = excluded.type,
+                            status = excluded.status,
+                            created_at = excluded.created_at,
+                            content = excluded.content,
+                            content_hash = excluded.content_hash,
+                            model = excluded.model,
+                            input_tokens = excluded.input_tokens,
+                            output_tokens = excluded.output_tokens,
+                            cost = excluded.cost
                         """,
                         (
                             turn_id, session_id, turn["step_index"], turn["source"], turn["type"], turn["status"],
