@@ -27,7 +27,7 @@ def _get_model():
     if _genai_model is None or _active_api_key != api_key:
         try:
             genai.configure(api_key=api_key)
-            _genai_model = genai.GenerativeModel("gemini-1.5-flash")
+            _genai_model = genai.GenerativeModel("gemini-3.5-flash")
             _active_api_key = api_key
         except Exception as e:
             print(f"Error configuring Google Generative AI SDK: {e}")

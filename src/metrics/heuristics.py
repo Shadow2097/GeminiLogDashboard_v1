@@ -66,33 +66,50 @@ def check_context_debt(input_tokens, output_tokens):
 
 def run_compression_audit(prompt_text):
     """
-    Runs an LLM-in-the-loop compression audit using Gemini 1.5 Flash.
+    Runs an LLM-in-the-loop compression audit using Gemini Flash (with automatic fallbacks).
     Returns a comparison of original vs optimized text, token count difference, and savings ratio.
     """
     api_key = get_setting("api_key")
     if not api_key:
         return {"error": "API Key is required to run the LLM-in-the-loop compression audit. Please configure it in Settings."}
         
+    system_instruction = (
+        "You are a prompt optimizer. Rewrite the following user prompt to be as concise, direct, "
+        "and instruction-dense as possible, while retaining 100% of the original instructions, "
+        "intent, code blocks, parameters, and details. Remove all conversational pleasantries, "
+        "preambles, and filler language. Return ONLY the optimized prompt text with no explanation, "
+        "introductory phrases, or markdown styling outside the prompt itself."
+    )
+    
     try:
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-1.5-flash")
         
-        system_instruction = (
-            "You are a prompt optimizer. Rewrite the following user prompt to be as concise, direct, "
-            "and instruction-dense as possible, while retaining 100% of the original instructions, "
-            "intent, code blocks, parameters, and details. Remove all conversational pleasantries, "
-            "preambles, and filler language. Return ONLY the optimized prompt text with no explanation, "
-            "introductory phrases, or markdown styling outside the prompt itself."
-        )
+        # Try models in sequence of preference
+        models_to_try = ["gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.0-flash"]
+        last_error = None
+        optimized_text = None
+        used_model = None
         
-        response = model.generate_content(
-            contents=[
-                {"role": "user", "parts": [f"{system_instruction}\n\nORIGINAL PROMPT:\n{prompt_text}"]}
-            ]
-        )
-        
-        optimized_text = response.text.strip()
-        
+        for model_name in models_to_try:
+            try:
+                model = genai.GenerativeModel(model_name)
+                response = model.generate_content(
+                    contents=[
+                        {"role": "user", "parts": [f"{system_instruction}\n\nORIGINAL PROMPT:\n{prompt_text}"]}
+                    ]
+                )
+                optimized_text = response.text.strip()
+                used_model = model_name
+                break
+            except Exception as e:
+                last_error = str(e)
+                # Log failure and try next model
+                print(f"Audit failure for {model_name}: {e}")
+                continue
+                
+        if optimized_text is None:
+            return {"error": f"LLM Compression Audit failed. Tried {models_to_try} but all failed. Last error: {last_error}"}
+            
         # Calculate tokens
         orig_tokens = count_tokens(prompt_text)
         opt_tokens = count_tokens(optimized_text)
@@ -106,7 +123,9 @@ def run_compression_audit(prompt_text):
             "original_tokens": orig_tokens,
             "optimized_tokens": opt_tokens,
             "savings_tokens": savings_tokens,
-            "savings_ratio": savings_ratio
+            "savings_ratio": savings_ratio,
+            "model_used": used_model
         }
     except Exception as e:
         return {"error": f"LLM Compression Audit failed: {str(e)}"}
+

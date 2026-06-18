@@ -177,9 +177,10 @@ st.title("📊 Gemini Log & Token Efficiency Dashboard")
 st.markdown("Monitor and optimize your local AntiGravity LLM interactions and token consumption.")
 
 # Tab setup
-tab_overview, tab_explorer, tab_playground = st.tabs([
+tab_overview, tab_explorer, tab_advice, tab_playground = st.tabs([
     "📈 Overview Dashboard", 
     "💬 Session Explorer", 
+    "💡 Advice",
     "🔍 Prompt Auditor & Playground"
 ])
 
@@ -474,7 +475,140 @@ with tab_explorer:
     else:
         st.info("No conversation sessions loaded. Please configure the logs path and sync.")
 
-# ----------------- TAB 3: PLAYGROUND -----------------
+# ----------------- TAB 3: ADVICE -----------------
+with tab_advice:
+    st.subheader("💡 Prompt Optimization & History Advice")
+    st.markdown("Review actionable suggestions to optimize your prompt styles and reduce context debt.")
+    
+    pleasantry_candidates = []
+    context_debt_candidates = []
+    
+    with get_connection() as conn:
+        # Query potential pleasantry turns (User turns that are not dismissed)
+        user_rows = conn.execute("""
+            SELECT t.turn_id, t.session_id, t.step_index, t.content, t.created_at, s.title 
+            FROM turns t 
+            JOIN sessions s ON t.session_id = s.session_id 
+            WHERE (t.source != 'MODEL' AND t.source != 'SYSTEM') AND t.is_dismissed = 0
+            ORDER BY t.created_at DESC
+        """).fetchall()
+        
+        # Query potential context debt turns (Model turns that triggered warnings and are not dismissed)
+        model_rows = conn.execute("""
+            SELECT t.turn_id, t.session_id, t.step_index, t.input_tokens, t.output_tokens, t.cost, t.created_at, s.title 
+            FROM turns t 
+            JOIN sessions s ON t.session_id = s.session_id 
+            WHERE t.source = 'MODEL' AND t.is_dismissed = 0 
+              AND (t.input_tokens > 40000 OR (t.input_tokens > 8000 AND t.input_tokens / CAST(MAX(1, t.output_tokens) AS REAL) > 15.0))
+            ORDER BY t.created_at DESC
+        """).fetchall()
+        
+        # Process pleasantries
+        for row in user_rows:
+            pleasantries = detect_pleasantries(row["content"])
+            if pleasantries:
+                pleasantry_candidates.append({
+                    "type": "pleasantry",
+                    "turn_id": row["turn_id"],
+                    "session_id": row["session_id"],
+                    "step_index": row["step_index"],
+                    "content": row["content"],
+                    "created_at": row["created_at"],
+                    "session_title": row["title"],
+                    "pleasantries": pleasantries
+                })
+                
+        # Process context debt triggers
+        for row in model_rows:
+            user_trigger = conn.execute("""
+                SELECT turn_id, step_index, content, created_at 
+                FROM turns 
+                WHERE session_id = ? AND step_index < ? AND (source != 'MODEL' AND source != 'SYSTEM')
+                ORDER BY step_index DESC LIMIT 1
+            """, (row["session_id"], row["step_index"])).fetchone()
+            
+            if user_trigger:
+                context_debt_candidates.append({
+                    "type": "context_debt",
+                    "turn_id": row["turn_id"],
+                    "user_turn_id": user_trigger["turn_id"],
+                    "session_id": row["session_id"],
+                    "step_index": user_trigger["step_index"],
+                    "model_step_index": row["step_index"],
+                    "content": user_trigger["content"],
+                    "created_at": user_trigger["created_at"],
+                    "session_title": row["title"],
+                    "input_tokens": row["input_tokens"],
+                    "output_tokens": row["output_tokens"],
+                    "cost": row["cost"]
+                })
+                
+    advice_items = pleasantry_candidates + context_debt_candidates
+    advice_items.sort(key=lambda x: x["created_at"], reverse=True)
+    
+    if not advice_items:
+        st.markdown(
+            '<div class="success-card">✅ <b>Outstanding!</b> No low-value pleasantries or high context debt warnings detected. Your prompting is highly efficient!</div>',
+            unsafe_allow_html=True
+        )
+    else:
+        st.markdown(f"Found **{len(advice_items)}** prompt optimization opportunities. Review them below:")
+        
+        for item in advice_items:
+            card_key = item["turn_id"]
+            
+            with st.container():
+                st.markdown("---")
+                col_header, col_actions = st.columns([3, 1])
+                
+                with col_header:
+                    st.markdown(f"**Session:** {item['session_title']} &nbsp;•&nbsp; *Step {item['step_index']}*")
+                    if item["type"] == "pleasantry":
+                        st.markdown(
+                            f'<span style="background-color: #272111; color: #f59e0b; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600;">⚠️ PLEASANTRY FILTER</span>', 
+                            unsafe_allow_html=True
+                        )
+                        st.markdown(f"**Phrases matched:** {', '.join([f'\"{p}\"' for p in item['pleasantries']])}")
+                    else:
+                        ratio = item['input_tokens'] / max(1, item['output_tokens'])
+                        st.markdown(
+                            f'<span style="background-color: #2e100a; color: #f43f5e; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600;">🚨 HIGH CONTEXT DEBT ({ratio:.1f}x)</span>', 
+                            unsafe_allow_html=True
+                        )
+                        st.markdown(
+                            f"**Spike Details:** Consumed **{item['input_tokens']:,}** input tokens to get **{item['output_tokens']:,}** output tokens. Cost: **${item['cost']:.5f}**."
+                        )
+                        
+                with col_actions:
+                    if st.button("Dismiss Advice", key=f"dismiss_{card_key}", use_container_width=True):
+                        with get_connection() as conn:
+                            conn.execute("UPDATE turns SET is_dismissed = 1 WHERE turn_id = ?", (item["turn_id"],))
+                            if item["type"] == "context_debt":
+                                conn.execute("UPDATE turns SET is_dismissed = 1 WHERE turn_id = ?", (item["user_turn_id"],))
+                        st.success("Dismissed!")
+                        st.rerun()
+                        
+                st.markdown("**Original Prompt:**")
+                st.code(item["content"], wrap_lines=True)
+                
+                with st.expander("🪄 Optimize this prompt"):
+                    st.markdown("Click below to let Gemini Flash rewrite this prompt and measure expected token savings.")
+                    if st.button("Optimize Prompt", key=f"opt_btn_{card_key}"):
+                        with st.spinner("Rewriting..."):
+                            audit = run_compression_audit(item["content"])
+                            if "error" in audit:
+                                st.error(audit["error"])
+                            else:
+                                st.markdown(f"**Savings:** {audit['savings_ratio'] * 100.0:.1f}% (-{audit['savings_tokens']} tokens)")
+                                col_o, col_opt = st.columns(2)
+                                with col_o:
+                                    st.markdown("Original:")
+                                    st.code(item["content"], wrap_lines=True)
+                                with col_opt:
+                                    st.markdown("Optimized Suggestions:")
+                                    st.code(audit["optimized_prompt"], wrap_lines=True)
+
+# ----------------- TAB 4: PLAYGROUND -----------------
 with tab_playground:
     st.subheader("🔍 Prompt Auditor")
     st.markdown("Paste your proposed prompt below to measure its length, detect pleasantries, and audit compression savings.")

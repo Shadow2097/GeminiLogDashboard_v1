@@ -47,6 +47,7 @@ def init_db():
             input_tokens INTEGER DEFAULT 0,
             output_tokens INTEGER DEFAULT 0,
             cost REAL DEFAULT 0.0,
+            is_dismissed INTEGER DEFAULT 0,
             FOREIGN KEY (session_id) REFERENCES sessions (session_id) ON DELETE CASCADE
         );
         """)
@@ -82,3 +83,9 @@ def init_db():
             SET value = ? 
             WHERE key = 'logs_directory' AND value = 'C:\\Users\\Mike Markiw\\.gemini\\antigravity\\brain'
         """, (default_logs_dir,))
+        
+        # Check if is_dismissed column exists in turns table (for migration)
+        cursor = conn.execute("PRAGMA table_info(turns);")
+        columns = [row[1] for row in cursor.fetchall()]
+        if "is_dismissed" not in columns:
+            conn.execute("ALTER TABLE turns ADD COLUMN is_dismissed INTEGER DEFAULT 0;")
