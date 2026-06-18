@@ -477,6 +477,7 @@ with tab_explorer:
 
 # ----------------- TAB 3: ADVICE -----------------
 with tab_advice:
+    st.markdown('<div id="advice-top"></div>', unsafe_allow_html=True)
     st.subheader("💡 Prompt Optimization & History Advice")
     st.markdown("Review actionable suggestions to optimize your prompt styles and reduce context debt.")
     
@@ -607,6 +608,12 @@ with tab_advice:
                                 with col_opt:
                                     st.markdown("Optimized Suggestions:")
                                     st.code(audit["optimized_prompt"], wrap_lines=True)
+                                    
+                # Back to Top Link
+                st.markdown(
+                    f'<div style="text-align: right; margin-top: 10px;"><a href="#advice-top" target="_self" style="color: #38bdf8; text-decoration: none; font-size: 0.8rem; font-weight: 500;">▲ Back to Top</a></div>',
+                    unsafe_allow_html=True
+                )
 
 # ----------------- TAB 4: PLAYGROUND -----------------
 with tab_playground:
