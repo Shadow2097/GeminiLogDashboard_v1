@@ -45,30 +45,33 @@ div[data-testid="stMetric"] {
 }
 
 .warning-card {
-    background-color: rgba(234, 179, 8, 0.1);
+    background-color: #272111;
     border-left: 5px solid #eab308;
     padding: 12px 16px;
     border-radius: 6px;
     margin: 10px 0;
-    color: #fef08a;
+    color: #ffedd5;
+    font-weight: 500;
 }
 
 .info-card {
-    background-color: rgba(56, 189, 248, 0.1);
+    background-color: #0f1c2e;
     border-left: 5px solid #38bdf8;
     padding: 12px 16px;
     border-radius: 6px;
     margin: 10px 0;
     color: #e0f2fe;
+    font-weight: 500;
 }
 
 .success-card {
-    background-color: rgba(34, 197, 94, 0.1);
+    background-color: #0d2216;
     border-left: 5px solid #22c55e;
     padding: 12px 16px;
     border-radius: 6px;
     margin: 10px 0;
     color: #dcfce7;
+    font-weight: 500;
 }
 
 .metric-grid {
