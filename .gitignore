@@ -1,0 +1,26 @@
+# Python Virtual Environment
+.venv/
+venv/
+ENV/
+
+# Python Cache & Compiled Files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Local Database Cache (SQLite)
+# Excludes the data directory containing SQLite database and settings
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Streamlit config (if generated)
+.streamlit/
+
+# OS Specific Files
+Thumbs.db
+Desktop.ini
+.DS_Store
