@@ -388,7 +388,29 @@ with tab_explorer:
                 yaxis=dict(title="Accumulated Context Tokens"),
                 margin=dict(l=40, r=40, t=20, b=40)
             )
-            st.plotly_chart(fig_growth, use_container_width=True)
+            
+            selected_data = st.plotly_chart(
+                fig_growth, 
+                use_container_width=True,
+                on_select="rerun",
+                selection_mode="points"
+            )
+            
+            if selected_data and "selection" in selected_data:
+                points = selected_data["selection"].get("points", [])
+                if points:
+                    clicked_step_idx = points[0].get("x")
+                    if clicked_step_idx is not None:
+                        st.components.v1.html(f"""
+                        <script>
+                            setTimeout(() => {{
+                                const element = window.parent.document.getElementById("step-card-{clicked_step_idx}");
+                                if (element) {{
+                                    element.scrollIntoView({{ behavior: "smooth", block: "center" }});
+                                }}
+                            }}, 100);
+                        </script>
+                        """, height=0, width=0)
             
             # Transcript Explorer
             st.subheader("💬 Conversation Transcript & Insights")
@@ -414,6 +436,7 @@ with tab_explorer:
                     label = f"👤 User Input"
                     
                 with st.chat_message(role):
+                    st.markdown(f'<div id="step-card-{step_idx}"></div>', unsafe_allow_html=True)
                     st.markdown(f"**{label}** &nbsp;•&nbsp; *Step {step_idx}* &nbsp;•&nbsp; *{created}*")
                     st.text(content)
                     
